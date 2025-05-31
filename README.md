@@ -3,10 +3,15 @@
 ### Innovation: Bridges FAO-56 science with AI/ML for farmer-friendly irrigation.
 ### Impact: Sustainable water use, higher yields for small farmers.
 
+---
 #### For Testing Purpose
-User name: Test Farmer
-Phone : 1234567890
-
-- curl -X POST http://localhost:5000/api/generate-schedule \
+--> User credentials:
+```bash
+- User name: Test Farmer
+- Phone : 1234567890
+```
+```bash
+curl -X POST http://localhost:5000/api/generate-schedule \
   -H "Content-Type: application/json" \
   -d '{"personal_info":{"farmer_name":"Test Farmer","phone":"1234567890"},"soil_type":"Sandy Loam","crop_info":{"name":"Rice","growth_stage":2},"location":{"address":"Phalodi"},"farm_size":{"area":"2"}}'
+```

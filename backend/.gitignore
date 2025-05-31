@@ -1,0 +1,27 @@
+# Environment files
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+irrigation_env/
+venv/
+env/
+
+# Node modules (if it's a Node/React project too)
+node_modules/
+
+# MacOS-specific
+.DS_Store
+
+# Logs
+*.log
+
+# Compiled files
+*.pyc
+
+# IDE-specific
+.vscode/
+.idea/

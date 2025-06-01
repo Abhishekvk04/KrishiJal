@@ -17,7 +17,7 @@ const Login = ({ setUser }) => {
     setError('');
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/login`, formData);
+      const response = await axios.post('https://krishijal.onrender.com/api/login', formData);
       if (response.data.success) {
         // Ensure phone is included in user object
         setUser({

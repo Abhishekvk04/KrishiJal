@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://krishijal.onrender.com';
+const API_BASE_URL = 'https://krishijal.onrender.com';
 
 const Dashboard = ({ user, formData, setFormData }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -16,24 +16,23 @@ const Dashboard = ({ user, formData, setFormData }) => {
     fetchCrops();
   }, []);
 
-const fetchSoilTypes = async () => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/api/soil-types`);
-    setSoilTypes(response.data);
-  } catch (error) {
-    console.error('Error fetching soil types:', error);
-  }
-};
+  const fetchSoilTypes = async () => {
+    try {
+      const response = await axios.get('https://krishijal.onrender.com/api/soil-types');
+      setSoilTypes(response.data);
+    } catch (error) {
+      console.error('Error fetching soil types:', error);
+    }
+  };
 
-const fetchCrops = async () => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/api/crops`);
-    setCrops(response.data);
-  } catch (error) {
-    console.error('Error fetching crops:', error);
-  }
-};
-
+  const fetchCrops = async () => {
+    try {
+      const response = await axios.get('https://krishijal.onrender.com/api/crops');
+      setCrops(response.data);
+    } catch (error) {
+      console.error('Error fetching crops:', error);
+    }
+  };
 
   const handleNext = () => {
     if (currentStep < 6) {
@@ -59,7 +58,7 @@ const fetchCrops = async () => {
       }
     };
 
-    const response = await axios.post(`${API_BASE_URL}/api/generate-schedule`, submissionData);
+    const response = await axios.post('https://krishijal.onrender.com/api/generate-schedule', submissionData);
     
     if (response.data.success) {
       navigate('/schedule', { 
@@ -381,7 +380,7 @@ const SoilImageClassification = ({ formData, updateFormData, soilTypes }) => {
     formData.append('soil_image', file);
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/classify-soil`, formData, {
+      const response = await axios.post('https://krishijal.onrender.com/api/classify-soil', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
@@ -401,7 +400,7 @@ const SoilImageClassification = ({ formData, updateFormData, soilTypes }) => {
 
   const handleManualSelection = async (soilType) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/select-soil-manual`, {
+      const response = await axios.post('https://krishijal.onrender.com/api/select-soil-manual', {
         soil_type: soilType
       });
       

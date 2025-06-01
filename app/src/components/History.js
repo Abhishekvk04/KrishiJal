@@ -20,7 +20,7 @@ const History = ({ user }) => {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/history`, {  // FIX URL
+      const response = await axios.get('https://krishijal.onrender.com/api/history', {  // FIX URL
         params: { phone: user.phone }
       });
       setReports(response.data.reports);
@@ -33,7 +33,7 @@ const History = ({ user }) => {
 
   const fetchRetention = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/retention`);  // FIX URL
+      const response = await axios.get('https://krishijal.onrender.com/api/retention');  // FIX URL
       setRetentionDays(response.data.retention_days);
     } catch (error) {
       console.error('Error fetching retention:', error);
@@ -43,7 +43,7 @@ const History = ({ user }) => {
   const handleDelete = async (reportId) => {
     if (window.confirm('Delete this report permanently?')) {
       try {
-        await axios.delete(`${API_BASE_URL}/api/history/${reportId}`);  // FIX URL
+        await axios.delete(`https://krishijal.onrender.com/api/history/${reportId}`);  // FIX URL
         setReports(reports.filter(r => r.id !== reportId));
       } catch (error) {
         console.error('Error deleting report:', error);
@@ -69,7 +69,7 @@ const History = ({ user }) => {
   
   const updateRetention = async (days) => {
     try {
-      await axios.put(`${API_BASE_URL}/api/retention`, { days });  // FIX URL
+      await axios.put('https://krishijal.onrender.com/api/retention', { days });  // FIX URL
       setRetentionDays(days);
     } catch (error) {
       console.error('Error updating retention:', error);

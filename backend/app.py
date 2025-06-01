@@ -22,7 +22,8 @@ from utils.json_encoder import NpEncoder
 
 
 app = Flask(__name__)
-CORS(app, origins=["*"])
+#CORS(app, origins=["*"])
+CORS(app, origins=["https://krishi-jal.vercel.app"])
 
 app.json_encoder = NpEncoder
 

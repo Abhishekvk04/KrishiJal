@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://krishijal.onrender.com';
+
 const Login = ({ setUser }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -15,7 +17,7 @@ const Login = ({ setUser }) => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/login', formData);
+      const response = await axios.post(`${API_BASE_URL}/api/login`, formData);
       if (response.data.success) {
         // Ensure phone is included in user object
         setUser({

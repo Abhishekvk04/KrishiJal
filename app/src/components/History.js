@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://krishijal.onrender.com';
+
 const History = ({ user }) => {
   const [reports, setReports] = useState([]);
   const [retentionDays, setRetentionDays] = useState(30);
@@ -18,7 +20,7 @@ const History = ({ user }) => {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/api/history', {  // FIX URL
+      const response = await axios.get(`${API_BASE_URL}/api/history`, {  // FIX URL
         params: { phone: user.phone }
       });
       setReports(response.data.reports);
@@ -31,7 +33,7 @@ const History = ({ user }) => {
 
   const fetchRetention = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/retention');  // FIX URL
+      const response = await axios.get(`${API_BASE_URL}/api/retention`);  // FIX URL
       setRetentionDays(response.data.retention_days);
     } catch (error) {
       console.error('Error fetching retention:', error);
@@ -41,7 +43,7 @@ const History = ({ user }) => {
   const handleDelete = async (reportId) => {
     if (window.confirm('Delete this report permanently?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/history/${reportId}`);  // FIX URL
+        await axios.delete(`${API_BASE_URL}/api/history/${reportId}`);  // FIX URL
         setReports(reports.filter(r => r.id !== reportId));
       } catch (error) {
         console.error('Error deleting report:', error);
@@ -67,7 +69,7 @@ const History = ({ user }) => {
   
   const updateRetention = async (days) => {
     try {
-      await axios.put('http://localhost:5000/api/retention', { days });  // FIX URL
+      await axios.put(`${API_BASE_URL}/api/retention`, { days });  // FIX URL
       setRetentionDays(days);
     } catch (error) {
       console.error('Error updating retention:', error);

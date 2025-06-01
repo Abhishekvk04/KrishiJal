@@ -4,7 +4,9 @@ from datetime import datetime, timedelta
 import requests
 from models.data_models import SOIL_TYPES, CROP_DATABASE, SOIL_THRESHOLDS, IRRIGATION_TRIGGERS
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
 class WeatherAPIClient:
     def __init__(self, api_key):
         self.api_key = api_key

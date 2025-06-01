@@ -14,3 +14,4 @@ keras==2.13.1
 tensorflow==2.13.0
 Flask-SQLAlchemy==3.0.3
 APScheduler==3.11.0
+gunicorn

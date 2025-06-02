@@ -118,7 +118,7 @@ const Dashboard = ({ user, formData, setFormData }) => {
       setSelectedImage(file);
       setLoading(true);
       setPrediction(null);
-      setLoadingStage('Uploading image...');
+      setLoadingStage('Processing image...');
 
       const formDataUpload = new FormData();
       formDataUpload.append('soil_image', file);
@@ -138,13 +138,20 @@ const Dashboard = ({ user, formData, setFormData }) => {
             }
           }
         );
-        
+        console.log('Soil classification response:', response.data);
         // Success handling...
+       if (response.data.success) {
         setPrediction(response.data);
+        
+        // ALSO update form data
         updateFormData({ 
           soil_type: response.data.predicted_soil_type,
-          soil_confidence: response.data.confidence 
+          soil_confidence: response.data.confidence,
+          soil_classification_method: response.data.method
         });
+        
+        console.log('Prediction set:', response.data); // DEBUG LOG
+      }
         
       } catch (error) {
         console.error('Soil classification error:', error);
@@ -232,7 +239,7 @@ const Dashboard = ({ user, formData, setFormData }) => {
         )}
         
         {/* Image Upload Area */}
-        {!prediction && !showManualSelection && (
+        {!prediction && !showManualSelection && !loading && (
           <div className="mb-8">
             <label className="block text-sm font-medium text-gray-700 mb-4">
               Upload Soil Image for AI Classification
@@ -282,34 +289,41 @@ const Dashboard = ({ user, formData, setFormData }) => {
           </div>
         )}
 
-        {/* Prediction Results */}
-        {prediction && (
+        {/* Prediction Results - ADD DEBUGGING */}
+        {prediction && !loading && (
           <div className="bg-primary-50 p-6 rounded-xl border border-primary-200 mb-6">
             <h4 className="text-xl font-bold text-primary-600 mb-4">
               🎯 Soil Classification Results
             </h4>
             
+            {/* DEBUG: Show raw prediction data */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
+                <strong>Debug:</strong> {JSON.stringify(prediction, null, 2)}
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h5 className="font-semibold mb-2">Predicted Soil Type:</h5>
                 <p className="text-2xl font-bold text-primary-600">
-                  {prediction.predicted_soil_type}
+                  {prediction.predicted_soil_type || 'Unknown'}
                 </p>
                 <p className="text-sm text-gray-600 mt-1">
-                  Confidence: {prediction.confidence}%
+                  Confidence: {prediction.confidence || 0}%
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Method: {prediction.method?.replace('_', ' ')}
+                  Method: {prediction.method?.replace('_', ' ') || 'Unknown'}
                 </p>
               </div>
               
               <div>
                 <h5 className="font-semibold mb-2">Soil Properties:</h5>
                 <div className="space-y-1 text-sm">
-                  <div>💧 Water Holding: {prediction.soil_properties?.water_holding_capacity}</div>
-                  <div>⬇️ Infiltration: {prediction.soil_properties?.infiltration_rate}</div>
-                  <div>🌊 Field Capacity: {(prediction.soil_properties?.field_capacity * 100).toFixed(1)}%</div>
-                  <div>📝 Description: {prediction.soil_properties?.description}</div>
+                  <div>💧 Water Holding: {prediction.soil_properties?.water_holding_capacity || 'Unknown'}</div>
+                  <div>⬇️ Infiltration: {prediction.soil_properties?.infiltration_rate || 'Unknown'}</div>
+                  <div>🌊 Field Capacity: {prediction.soil_properties?.field_capacity ? (prediction.soil_properties.field_capacity * 100).toFixed(1) + '%' : 'Unknown'}</div>
+                  <div>📝 Description: {prediction.soil_properties?.description || 'No description available'}</div>
                 </div>
               </div>
             </div>
@@ -335,8 +349,9 @@ const Dashboard = ({ user, formData, setFormData }) => {
           </div>
         )}
 
+
         {/* Manual Selection */}
-        {showManualSelection && (
+        {showManualSelection && !loading && (
           <div className="mb-6">
             <h4 className="text-lg font-semibold mb-4">Manual Soil Type Selection</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -376,14 +391,14 @@ const Dashboard = ({ user, formData, setFormData }) => {
         )}
 
         {/* Selected Soil Summary */}
-        {(prediction || manualSoilType) && (
+        {(prediction || manualSoilType) && !loading && (
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
             <h4 className="font-semibold text-green-700 mb-2">
               ✅ Soil Type Selected: {formData.soil_type}
             </h4>
             <p className="text-sm text-green-600">
-              Confidence: {formData.soil_confidence}% | 
-              Method: {formData.soil_classification_method?.replace('_', ' ')}
+              Confidence: {formData.soil_confidence || prediction?.confidence}% | 
+              Method: {(formData.soil_classification_method || prediction?.method)?.replace('_', ' ')}
             </p>
           </div>
         )}

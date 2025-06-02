@@ -183,7 +183,7 @@ def classify_soil():
                 'method': result['method'],
                 'soil_properties': soil_properties
             })
-            
+
         except Exception as processing_error:
             print(f"Processing error: {processing_error}")
             

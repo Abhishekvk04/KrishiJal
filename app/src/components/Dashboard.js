@@ -105,78 +105,155 @@ const Dashboard = ({ user, formData, setFormData }) => {
     const [showManualSelection, setShowManualSelection] = useState(false);
     const [manualSoilType, setManualSoilType] = useState('');
 
+    useEffect(() => {
+      console.log('🔍 Prediction state changed:', prediction);
+    }, [prediction]);
+
+    useEffect(() => {
+      console.log('⏳ Loading state changed:', loading);
+    }, [loading]);
+
+    useEffect(() => {
+      console.log('📝 Form data changed:', formData);
+    }, [formData]);
+
+    useEffect(() => {
+      console.log('🔧 Show manual selection changed:', showManualSelection);
+    }, [showManualSelection]);
+    
+    // const handleImageUpload = async (event) => {
+    //   const file = event.target.files[0];
+    //   if (!file) return;
+
+    //   // Validate file size (reduce to 2MB for faster processing)
+    //   if (file.size > 2 * 1024 * 1024) {
+    //     alert('File size too large. Please upload an image smaller than 2MB.');
+    //     return;
+    //   }
+
+    //   setSelectedImage(file);
+    //   setLoading(true);
+    //   setPrediction(null);
+    //   setLoadingStage('Processing image...');
+
+    //   const formDataUpload = new FormData();
+    //   formDataUpload.append('soil_image', file);
+
+    //   try {
+    //     setLoadingStage('Processing image... This may take up to 2 minutes on free hosting');
+        
+    //     const response = await axios.post(
+    //       `${API_BASE_URL}/api/classify-soil`, 
+    //       formDataUpload, 
+    //       {
+    //         headers: { 'Content-Type': 'multipart/form-data' },
+    //         timeout: 180000, // Increase to 3 minutes
+    //         onUploadProgress: (progressEvent) => {
+    //           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+    //           setLoadingStage(`Uploading... ${percentCompleted}%`);
+    //         }
+    //       }
+    //     );
+    //     console.log('Soil classification response:', response.data);
+    //     // Success handling...
+    //    if (response.data.success) {
+    //     setPrediction(response.data);
+        
+    //     // ALSO update form data
+    //     updateFormData({ 
+    //       soil_type: response.data.predicted_soil_type,
+    //       soil_confidence: response.data.confidence,
+    //       soil_classification_method: response.data.method
+    //     });
+        
+    //     console.log('Prediction set:', response.data); // DEBUG LOG
+    //   }
+        
+    //   } catch (error) {
+    //     console.error('Soil classification error:', error);
+        
+    //     if (error.code === 'ECONNABORTED') {
+    //       // Timeout error - show helpful message
+    //       alert(`
+    //         The server took too long to respond (over 3 minutes). 
+    //         This often happens with free hosting when the server is "sleeping".
+            
+    //         Please try:
+    //         1. Using a smaller image (under 1MB)
+    //         2. Waiting a few minutes and trying again
+    //         3. Or select soil type manually below
+    //       `);
+    //       setShowManualSelection(true);
+    //     } else {
+    //       alert('Error classifying soil. Please select soil type manually.');
+    //       setShowManualSelection(true);
+    //     }
+    //   } finally {
+    //     setLoading(false);
+    //     setLoadingStage('');
+    //   }
+    // };
+
     const handleImageUpload = async (event) => {
       const file = event.target.files[0];
       if (!file) return;
 
-      // Validate file size (reduce to 2MB for faster processing)
-      if (file.size > 2 * 1024 * 1024) {
-        alert('File size too large. Please upload an image smaller than 2MB.');
-        return;
-      }
-
+      // Validation...
       setSelectedImage(file);
       setLoading(true);
-      setPrediction(null);
+      setPrediction(null); // Clear previous results
       setLoadingStage('Processing image...');
 
       const formDataUpload = new FormData();
       formDataUpload.append('soil_image', file);
 
       try {
-        setLoadingStage('Processing image... This may take up to 2 minutes on free hosting');
-        
         const response = await axios.post(
           `${API_BASE_URL}/api/classify-soil`, 
           formDataUpload, 
           {
             headers: { 'Content-Type': 'multipart/form-data' },
-            timeout: 180000, // Increase to 3 minutes
-            onUploadProgress: (progressEvent) => {
-              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              setLoadingStage(`Uploading... ${percentCompleted}%`);
-            }
+            timeout: 60000
           }
         );
-        console.log('Soil classification response:', response.data);
-        // Success handling...
-       if (response.data.success) {
-        setPrediction(response.data);
         
-        // ALSO update form data
-        updateFormData({ 
-          soil_type: response.data.predicted_soil_type,
-          soil_confidence: response.data.confidence,
-          soil_classification_method: response.data.method
-        });
+        console.log('API Response:', response.data); // Debug log
         
-        console.log('Prediction set:', response.data); // DEBUG LOG
-      }
+        // CRITICAL FIX: Ensure state is set correctly
+        if (response.data && response.data.success) {
+          const predictionData = {
+            predicted_soil_type: response.data.predicted_soil_type,
+            confidence: response.data.confidence,
+            method: response.data.method,
+            soil_properties: response.data.soil_properties || {
+              water_holding_capacity: 'Medium',
+              infiltration_rate: 'Moderate',
+              field_capacity: 0.25,
+              description: 'Good for irrigation'
+            }
+          };
+          
+          console.log('Setting prediction:', predictionData); // Debug log
+          setPrediction(predictionData);
+          
+          // Also update form data
+          updateFormData({ 
+            soil_type: response.data.predicted_soil_type,
+            soil_confidence: response.data.confidence,
+            soil_classification_method: response.data.method
+          });
+        }
         
       } catch (error) {
         console.error('Soil classification error:', error);
-        
-        if (error.code === 'ECONNABORTED') {
-          // Timeout error - show helpful message
-          alert(`
-            The server took too long to respond (over 3 minutes). 
-            This often happens with free hosting when the server is "sleeping".
-            
-            Please try:
-            1. Using a smaller image (under 1MB)
-            2. Waiting a few minutes and trying again
-            3. Or select soil type manually below
-          `);
-          setShowManualSelection(true);
-        } else {
-          alert('Error classifying soil. Please select soil type manually.');
-          setShowManualSelection(true);
-        }
+        alert('Error classifying soil. Please select manually.');
+        setShowManualSelection(true);
       } finally {
         setLoading(false);
         setLoadingStage('');
       }
     };
+
 
     const handleManualSelection = async (soilType) => {
       try {
@@ -197,6 +274,15 @@ const Dashboard = ({ user, formData, setFormData }) => {
         <h3 className="text-2xl font-bold text-primary-600 mb-6">
           🔬 Soil Type Classification
         </h3>
+
+        {/* Debug Info - Remove in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
+            <div>Prediction state: {prediction ? 'SET' : 'NULL'}</div>
+            <div>Loading: {loading ? 'TRUE' : 'FALSE'}</div>
+            <div>Show Manual: {showManualSelection ? 'TRUE' : 'FALSE'}</div>
+          </div>
+        )}
         
         {/* Enhanced Loading State */}
         {loading && (
@@ -289,41 +375,34 @@ const Dashboard = ({ user, formData, setFormData }) => {
           </div>
         )}
 
-        {/* Prediction Results - ADD DEBUGGING */}
+        {/* PREDICTION RESULTS - This should show when prediction exists */}
         {prediction && !loading && (
-          <div className="bg-primary-50 p-6 rounded-xl border border-primary-200 mb-6">
-            <h4 className="text-xl font-bold text-primary-600 mb-4">
+          <div className="bg-green-50 p-6 rounded-xl border border-green-200 mb-6">
+            <h4 className="text-xl font-bold text-green-700 mb-4">
               🎯 Soil Classification Results
             </h4>
-            
-            {/* DEBUG: Show raw prediction data */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
-                <strong>Debug:</strong> {JSON.stringify(prediction, null, 2)}
-              </div>
-            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h5 className="font-semibold mb-2">Predicted Soil Type:</h5>
-                <p className="text-2xl font-bold text-primary-600">
-                  {prediction.predicted_soil_type || 'Unknown'}
+                <p className="text-2xl font-bold text-green-600">
+                  {prediction.predicted_soil_type}
                 </p>
                 <p className="text-sm text-gray-600 mt-1">
-                  Confidence: {prediction.confidence || 0}%
+                  Confidence: {prediction.confidence}%
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Method: {prediction.method?.replace('_', ' ') || 'Unknown'}
+                  Method: {prediction.method?.replace('_', ' ')}
                 </p>
               </div>
               
               <div>
                 <h5 className="font-semibold mb-2">Soil Properties:</h5>
                 <div className="space-y-1 text-sm">
-                  <div>💧 Water Holding: {prediction.soil_properties?.water_holding_capacity || 'Unknown'}</div>
-                  <div>⬇️ Infiltration: {prediction.soil_properties?.infiltration_rate || 'Unknown'}</div>
-                  <div>🌊 Field Capacity: {prediction.soil_properties?.field_capacity ? (prediction.soil_properties.field_capacity * 100).toFixed(1) + '%' : 'Unknown'}</div>
-                  <div>📝 Description: {prediction.soil_properties?.description || 'No description available'}</div>
+                  <div>💧 Water Holding: {prediction.soil_properties?.water_holding_capacity}</div>
+                  <div>⬇️ Infiltration: {prediction.soil_properties?.infiltration_rate}</div>
+                  <div>🌊 Field Capacity: {prediction.soil_properties?.field_capacity ? (prediction.soil_properties.field_capacity * 100).toFixed(1) + '%' : 'N/A'}</div>
+                  <div>📝 Description: {prediction.soil_properties?.description}</div>
                 </div>
               </div>
             </div>
@@ -390,13 +469,13 @@ const Dashboard = ({ user, formData, setFormData }) => {
           </div>
         )}
 
-        {/* Selected Soil Summary */}
-        {(prediction || manualSoilType) && !loading && (
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <h4 className="font-semibold text-green-700 mb-2">
-              ✅ Soil Type Selected: {formData.soil_type}
+        {/* Final Selection Summary */}
+        {(prediction || formData.soil_type) && !loading && (
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <h4 className="font-semibold text-blue-700 mb-2">
+              ✅ Soil Type Selected: {formData.soil_type || prediction?.predicted_soil_type}
             </h4>
-            <p className="text-sm text-green-600">
+            <p className="text-sm text-blue-600">
               Confidence: {formData.soil_confidence || prediction?.confidence}% | 
               Method: {(formData.soil_classification_method || prediction?.method)?.replace('_', ' ')}
             </p>

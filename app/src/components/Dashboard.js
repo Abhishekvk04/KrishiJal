@@ -109,23 +109,11 @@ const Dashboard = ({ user, formData, setFormData }) => {
       const file = event.target.files[0];
       if (!file) return;
 
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/bmp', 'image/gif'];
-      if (!allowedTypes.includes(file.type)) {
-        alert('Please upload a valid image file (JPEG, PNG, BMP, GIF)');
+      // Validate file size (reduce to 2MB for faster processing)
+      if (file.size > 2 * 1024 * 1024) {
+        alert('File size too large. Please upload an image smaller than 2MB.');
         return;
       }
-
-      // Validate file size (max 5MB for better performance)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size too large. Please upload an image smaller than 5MB.');
-        return;
-      }
-
-      // Show image preview
-      const reader = new FileReader();
-      reader.onload = (e) => setImagePreview(e.target.result);
-      reader.readAsDataURL(file);
 
       setSelectedImage(file);
       setLoading(true);
@@ -136,14 +124,14 @@ const Dashboard = ({ user, formData, setFormData }) => {
       formDataUpload.append('soil_image', file);
 
       try {
-        setLoadingStage('Processing image...');
+        setLoadingStage('Processing image... This may take up to 2 minutes on free hosting');
         
         const response = await axios.post(
           `${API_BASE_URL}/api/classify-soil`, 
           formDataUpload, 
           {
             headers: { 'Content-Type': 'multipart/form-data' },
-            timeout: 60000,
+            timeout: 180000, // Increase to 3 minutes
             onUploadProgress: (progressEvent) => {
               const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
               setLoadingStage(`Uploading... ${percentCompleted}%`);
@@ -151,24 +139,31 @@ const Dashboard = ({ user, formData, setFormData }) => {
           }
         );
         
-        setLoadingStage('Analyzing soil properties...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
+        // Success handling...
         setPrediction(response.data);
         updateFormData({ 
           soil_type: response.data.predicted_soil_type,
-          soil_confidence: response.data.confidence,
-          soil_classification_method: response.data.method
+          soil_confidence: response.data.confidence 
         });
+        
       } catch (error) {
         console.error('Soil classification error:', error);
+        
         if (error.code === 'ECONNABORTED') {
-          setLoadingStage('Request timed out. Server may be sleeping...');
-          setTimeout(() => {
-            alert('The server is taking longer than expected. Please try with a smaller image or select soil type manually.');
-          }, 2000);
+          // Timeout error - show helpful message
+          alert(`
+            The server took too long to respond (over 3 minutes). 
+            This often happens with free hosting when the server is "sleeping".
+            
+            Please try:
+            1. Using a smaller image (under 1MB)
+            2. Waiting a few minutes and trying again
+            3. Or select soil type manually below
+          `);
+          setShowManualSelection(true);
         } else {
-          alert('Error classifying soil. Please try again or select manually.');
+          alert('Error classifying soil. Please select soil type manually.');
+          setShowManualSelection(true);
         }
       } finally {
         setLoading(false);

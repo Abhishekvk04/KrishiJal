@@ -1,34 +1,65 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://krishijal.onrender.com';
+import { useNavigate } from 'react-router-dom';
 
 const Login = ({ setUser }) => {
+  // ADD MISSING STATE DECLARATIONS
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     phone: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loadingMessage, setLoadingMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setLoadingMessage('Connecting to server...');
 
     try {
-      const response = await axios.post('https://krishijal.onrender.com/api/login', formData);
+      // Simulate connection delay awareness
+      setTimeout(() => {
+        if (loading) {
+          setLoadingMessage('Server is starting up... This may take up to 2 minutes on first load');
+        }
+      }, 5000);
+
+      setTimeout(() => {
+        if (loading) {
+          setLoadingMessage('Still connecting... Free hosting can be slow. Please wait...');
+        }
+      }, 30000);
+
+      const response = await axios.post(
+        'https://krishijal.onrender.com/api/login',
+        formData,
+        { 
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 180000 // 3 minute timeout
+        }
+      );
+      
       if (response.data.success) {
-        // Ensure phone is included in user object
+        setLoadingMessage('Login successful! Redirecting...');
         setUser({
           ...response.data.user,
-          phone: formData.phone  // ADD THIS LINE
+          phone: formData.phone
         });
+        navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      console.error('Login error:', err);
+      if (err.code === 'ECONNABORTED') {
+        setError('Connection timed out. The server may be sleeping. Please try again in a few minutes.');
+      } else {
+        setError(err.response?.data?.error || 'Login failed');
+      }
     } finally {
       setLoading(false);
+      setLoadingMessage('');
     }
   };
 
@@ -41,7 +72,22 @@ const Login = ({ setUser }) => {
 
   return (
     <div className="flex justify-center items-center min-h-[calc(100vh-80px)] p-8">
-      <div className="card p-12 max-w-md w-full text-center">
+      <div className="card p-12 max-w-md w-full text-center relative">
+        
+        {/* Enhanced loading overlay */}
+        {loading && (
+          <div className="absolute inset-0 bg-white bg-opacity-95 flex flex-col items-center justify-center rounded-lg z-10">
+            <div className="animate-spin text-4xl mb-4">⏳</div>
+            <p className="text-lg font-semibold text-primary-600 mb-2">{loadingMessage}</p>
+            <div className="w-full max-w-xs bg-gray-200 rounded-full h-2 mb-4">
+              <div className="bg-primary-600 h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
+            </div>
+            <p className="text-xs text-gray-500 text-center px-4">
+              Free hosting services can take time to wake up. Thank you for your patience!
+            </p>
+          </div>
+        )}
+
         <h2 className="text-3xl font-bold text-primary-600 mb-2">Farmer Login</h2>
         <p className="text-gray-600 mb-8">
           Enter your details to access the irrigation scheduling system
@@ -61,6 +107,7 @@ const Login = ({ setUser }) => {
               required
               placeholder="Enter your full name"
               className="form-input"
+              disabled={loading}
             />
           </div>
           
@@ -77,6 +124,7 @@ const Login = ({ setUser }) => {
               required
               placeholder="Enter your phone number"
               className="form-input"
+              disabled={loading}
             />
           </div>
           
@@ -86,10 +134,19 @@ const Login = ({ setUser }) => {
             </div>
           )}
           
-          <button type="submit" disabled={loading} className="btn btn-primary w-full">
-            {loading ? 'Logging in...' : 'Continue to Dashboard'}
+          <button 
+            type="submit" 
+            disabled={loading} 
+            className={`btn btn-primary w-full ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {loading ? 'Connecting...' : 'Continue to Dashboard'}
           </button>
         </form>
+        
+        {/* Server status info */}
+        <div className="mt-6 text-xs text-gray-500 text-center">
+          <p>💡 First login may take 1-2 minutes as the server starts up</p>
+        </div>
       </div>
     </div>
   );

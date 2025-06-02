@@ -18,7 +18,7 @@ const Dashboard = ({ user, formData, setFormData }) => {
 
   const fetchSoilTypes = async () => {
     try {
-      const response = await axios.get('https://krishijal.onrender.com/api/soil-types');
+      const response = await axios.get(`${API_BASE_URL}/api/soil-types`);
       setSoilTypes(response.data);
     } catch (error) {
       console.error('Error fetching soil types:', error);
@@ -27,7 +27,7 @@ const Dashboard = ({ user, formData, setFormData }) => {
 
   const fetchCrops = async () => {
     try {
-      const response = await axios.get('https://krishijal.onrender.com/api/crops');
+      const response = await axios.get(`${API_BASE_URL}/api/crops`);
       setCrops(response.data);
     } catch (error) {
       console.error('Error fetching crops:', error);
@@ -47,38 +47,353 @@ const Dashboard = ({ user, formData, setFormData }) => {
   };
 
   const handleSubmit = async () => {
-  setLoading(true);
-  try {
-    // Include phone in personal_info
-    const submissionData = {
-      ...formData,
-      personal_info: {
-        ...formData.personal_info,
-        phone: user.phone
+    setLoading(true);
+    try {
+      // Include phone in personal_info with proper validation
+      const submissionData = {
+        ...formData,
+        personal_info: {
+          ...formData.personal_info,
+          phone: user?.phone || formData.personal_info?.phone
+        }
+      };
+
+      console.log('Submitting data:', submissionData); // Debug log
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-schedule`, 
+        submissionData,
+        {
+          timeout: 180000, // 3 minute timeout
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        navigate('/schedule', { 
+          state: { 
+            scheduleData: response.data,
+            reportId: response.data.report_id 
+          } 
+        });
       }
-    };
-
-    const response = await axios.post('https://krishijal.onrender.com/api/generate-schedule', submissionData);
-    
-    if (response.data.success) {
-      navigate('/schedule', { 
-        state: { 
-          scheduleData: response.data,
-          reportId: response.data.report_id 
-        } 
-      });
+    } catch (error) {
+      console.error('Error generating schedule:', error);
+      if (error.code === 'ECONNABORTED') {
+        alert('Request timed out. The server may be sleeping. Please try again in a few minutes.');
+      } else {
+        alert('Error generating schedule. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Error generating schedule:', error);
-    alert('Error generating schedule. Please try again.'); // Add user feedback
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const updateFormData = (stepData) => {
     setFormData({ ...formData, ...stepData });
+  };
+
+  // ENHANCED SOIL CLASSIFICATION COMPONENT
+  const SoilImageClassification = ({ formData, updateFormData, soilTypes }) => {
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [prediction, setPrediction] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [loadingStage, setLoadingStage] = useState('');
+    const [imagePreview, setImagePreview] = useState(null);
+    const [showManualSelection, setShowManualSelection] = useState(false);
+    const [manualSoilType, setManualSoilType] = useState('');
+
+    const handleImageUpload = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/bmp', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Please upload a valid image file (JPEG, PNG, BMP, GIF)');
+        return;
+      }
+
+      // Validate file size (max 5MB for better performance)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size too large. Please upload an image smaller than 5MB.');
+        return;
+      }
+
+      // Show image preview
+      const reader = new FileReader();
+      reader.onload = (e) => setImagePreview(e.target.result);
+      reader.readAsDataURL(file);
+
+      setSelectedImage(file);
+      setLoading(true);
+      setPrediction(null);
+      setLoadingStage('Uploading image...');
+
+      const formDataUpload = new FormData();
+      formDataUpload.append('soil_image', file);
+
+      try {
+        setLoadingStage('Processing image...');
+        
+        const response = await axios.post(
+          `${API_BASE_URL}/api/classify-soil`, 
+          formDataUpload, 
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 60000,
+            onUploadProgress: (progressEvent) => {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              setLoadingStage(`Uploading... ${percentCompleted}%`);
+            }
+          }
+        );
+        
+        setLoadingStage('Analyzing soil properties...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setPrediction(response.data);
+        updateFormData({ 
+          soil_type: response.data.predicted_soil_type,
+          soil_confidence: response.data.confidence,
+          soil_classification_method: response.data.method
+        });
+      } catch (error) {
+        console.error('Soil classification error:', error);
+        if (error.code === 'ECONNABORTED') {
+          setLoadingStage('Request timed out. Server may be sleeping...');
+          setTimeout(() => {
+            alert('The server is taking longer than expected. Please try with a smaller image or select soil type manually.');
+          }, 2000);
+        } else {
+          alert('Error classifying soil. Please try again or select manually.');
+        }
+      } finally {
+        setLoading(false);
+        setLoadingStage('');
+      }
+    };
+
+    const handleManualSelection = async (soilType) => {
+      try {
+        setManualSoilType(soilType);
+        updateFormData({ 
+          soil_type: soilType,
+          soil_confidence: 100,
+          soil_classification_method: 'manual_selection'
+        });
+        setShowManualSelection(false);
+      } catch (error) {
+        console.error('Manual selection error:', error);
+      }
+    };
+
+    return (
+      <div className="p-8">
+        <h3 className="text-2xl font-bold text-primary-600 mb-6">
+          🔬 Soil Type Classification
+        </h3>
+        
+        {/* Enhanced Loading State */}
+        {loading && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-8 rounded-lg max-w-md text-center">
+              <div className="animate-spin text-6xl mb-4">🔄</div>
+              <h3 className="text-xl font-semibold mb-2">{loadingStage}</h3>
+              
+              <div className="space-y-2 text-sm text-gray-600">
+                {loadingStage.includes('Uploading') && (
+                  <p>📤 Sending image to server...</p>
+                )}
+                {loadingStage.includes('Processing') && (
+                  <p>🖥️ Server is processing your image...</p>
+                )}
+                {loadingStage.includes('Analyzing') && (
+                  <p>🧠 AI is analyzing soil properties...</p>
+                )}
+                {loadingStage.includes('timed out') && (
+                  <div className="text-orange-600">
+                    <p>⏰ Server is taking longer than expected</p>
+                    <p>This happens when the server is "sleeping" on free hosting</p>
+                    <p>Please wait or try manual selection</p>
+                  </div>
+                )}
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setLoading(false);
+                  setLoadingStage('');
+                  setShowManualSelection(true);
+                }}
+                className="mt-4 text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Cancel and select manually
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Image Upload Area */}
+        {!prediction && !showManualSelection && (
+          <div className="mb-8">
+            <label className="block text-sm font-medium text-gray-700 mb-4">
+              Upload Soil Image for AI Classification
+            </label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary-500 transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+                id="soil-image-upload"
+              />
+              <label htmlFor="soil-image-upload" className="cursor-pointer">
+                <div className="text-6xl mb-4">📷</div>
+                <p className="text-lg text-gray-600 mb-2">Click to upload soil image</p>
+                <p className="text-sm text-gray-500">
+                  Take a clear photo of your soil surface from about 1 meter height
+                </p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Supported formats: JPEG, PNG, BMP, GIF (max 5MB)
+                </p>
+              </label>
+            </div>
+            
+            <div className="text-center mt-4">
+              <button 
+                onClick={() => setShowManualSelection(true)}
+                className="text-primary-600 hover:underline text-sm"
+              >
+                Or select soil type manually
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Image Preview */}
+        {imagePreview && (
+          <div className="mb-6">
+            <h4 className="text-lg font-semibold mb-2">Uploaded Image:</h4>
+            <div className="flex justify-center">
+              <img 
+                src={imagePreview} 
+                alt="Soil sample" 
+                className="max-w-xs max-h-64 rounded-lg shadow-md object-cover"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Prediction Results */}
+        {prediction && (
+          <div className="bg-primary-50 p-6 rounded-xl border border-primary-200 mb-6">
+            <h4 className="text-xl font-bold text-primary-600 mb-4">
+              🎯 Soil Classification Results
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h5 className="font-semibold mb-2">Predicted Soil Type:</h5>
+                <p className="text-2xl font-bold text-primary-600">
+                  {prediction.predicted_soil_type}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Confidence: {prediction.confidence}%
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Method: {prediction.method?.replace('_', ' ')}
+                </p>
+              </div>
+              
+              <div>
+                <h5 className="font-semibold mb-2">Soil Properties:</h5>
+                <div className="space-y-1 text-sm">
+                  <div>💧 Water Holding: {prediction.soil_properties?.water_holding_capacity}</div>
+                  <div>⬇️ Infiltration: {prediction.soil_properties?.infiltration_rate}</div>
+                  <div>🌊 Field Capacity: {(prediction.soil_properties?.field_capacity * 100).toFixed(1)}%</div>
+                  <div>📝 Description: {prediction.soil_properties?.description}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button 
+                onClick={() => {
+                  setPrediction(null);
+                  setImagePreview(null);
+                  setSelectedImage(null);
+                }}
+                className="btn btn-outline text-sm"
+              >
+                📷 Upload Different Image
+              </button>
+              <button 
+                onClick={() => setShowManualSelection(true)}
+                className="btn btn-outline text-sm"
+              >
+                ✋ Choose Manually Instead
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Selection */}
+        {showManualSelection && (
+          <div className="mb-6">
+            <h4 className="text-lg font-semibold mb-4">Manual Soil Type Selection</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(soilTypes).map(([type, properties]) => (
+                <div
+                  key={type}
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                    manualSoilType === type
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 bg-white hover:border-primary-300'
+                  }`}
+                  onClick={() => handleManualSelection(type)}
+                >
+                  <h5 className="font-semibold text-primary-600 mb-2">{type}</h5>
+                  <p className="text-sm text-gray-600 mb-3">{properties.description}</p>
+                  <div className="space-y-1 text-xs">
+                    <div>💧 {properties.water_holding_capacity} water holding</div>
+                    <div>⬇️ {properties.infiltration_rate} infiltration</div>
+                    <div>🌊 {(properties.field_capacity * 100).toFixed(1)}% field capacity</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="text-center mt-4">
+              <button 
+                onClick={() => {
+                  setShowManualSelection(false);
+                  setManualSoilType('');
+                }}
+                className="text-primary-600 hover:underline text-sm"
+              >
+                ← Back to image upload
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Selected Soil Summary */}
+        {(prediction || manualSoilType) && (
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <h4 className="font-semibold text-green-700 mb-2">
+              ✅ Soil Type Selected: {formData.soil_type}
+            </h4>
+            <p className="text-sm text-green-600">
+              Confidence: {formData.soil_confidence}% | 
+              Method: {formData.soil_classification_method?.replace('_', ' ')}
+            </p>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderStep = () => {
@@ -104,7 +419,7 @@ const Dashboard = ({ user, formData, setFormData }) => {
 
   return (
     <div className="max-w-4xl mx-auto p-8">
-      {/* Add this at the top of the Dashboard component, before the progress bar */}
+      {/* Header with History Button */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-primary-600">Smart Irrigation Dashboard</h2>
         <button 
@@ -168,9 +483,16 @@ const Dashboard = ({ user, formData, setFormData }) => {
             <button 
               onClick={handleSubmit} 
               disabled={loading}
-              className="btn btn-primary"
+              className={`btn btn-primary ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {loading ? 'Generating Schedule...' : 'Generate Irrigation Schedule'}
+              {loading ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Generating Schedule...
+                </>
+              ) : (
+                'Generate Irrigation Schedule'
+              )}
             </button>
           )}
         </div>
@@ -179,13 +501,15 @@ const Dashboard = ({ user, formData, setFormData }) => {
   );
 };
 
-// Step Components with Tailwind CSS
-const PersonalInfo = ({ formData, updateFormData, user }) => {  // Add user prop
+// Keep all your existing component definitions (PersonalInfo, LocationInfo, CropInfo, FarmSizeInfo, ReviewInfo)
+// but add the missing useState import at the top of each component
+
+const PersonalInfo = ({ formData, updateFormData, user }) => {
   const [data, setData] = useState({
     farmer_name: formData.personal_info?.farmer_name || '',
     experience: formData.personal_info?.experience || '',
     contact_email: formData.personal_info?.contact_email || '',
-    phone: user?.phone || ''  // ADD THIS LINE
+    phone: user?.phone || ''
   });
 
   const handleChange = (e) => {
@@ -341,283 +665,6 @@ const LocationInfo = ({ formData, updateFormData }) => {
   );
 };
 
-const SoilImageClassification = ({ formData, updateFormData, soilTypes }) => {
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [prediction, setPrediction] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [showManualSelection, setShowManualSelection] = useState(false);
-  const [manualSoilType, setManualSoilType] = useState('');
-
-  const handleImageUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/bmp', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Please upload a valid image file (JPEG, PNG, BMP, GIF)');
-      return;
-    }
-
-    // Validate file size (max 16MB)
-    if (file.size > 16 * 1024 * 1024) {
-      alert('File size too large. Please upload an image smaller than 16MB.');
-      return;
-    }
-
-    // Show image preview
-    const reader = new FileReader();
-    reader.onload = (e) => setImagePreview(e.target.result);
-    reader.readAsDataURL(file);
-
-    setSelectedImage(file);
-    setLoading(true);
-    setPrediction(null);
-
-    // Send to backend for prediction
-    const formData = new FormData();
-    formData.append('soil_image', file);
-
-    try {
-      const response = await axios.post('https://krishijal.onrender.com/api/classify-soil', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
-      setPrediction(response.data);
-      updateFormData({ 
-        soil_type: response.data.predicted_soil_type,
-        soil_confidence: response.data.confidence,
-        soil_classification_method: response.data.method
-      });
-    } catch (error) {
-      console.error('Soil classification error:', error);
-      alert('Error classifying soil. Please try again or select manually.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleManualSelection = async (soilType) => {
-    try {
-      const response = await axios.post('https://krishijal.onrender.com/api/select-soil-manual', {
-        soil_type: soilType
-      });
-      
-      setManualSoilType(soilType);
-      updateFormData({ 
-        soil_type: soilType,
-        soil_confidence: 100,
-        soil_classification_method: 'manual_selection'
-      });
-      setShowManualSelection(false);
-    } catch (error) {
-      console.error('Manual selection error:', error);
-    }
-  };
-
-  return (
-    <div className="p-8">
-      <h3 className="text-2xl font-bold text-primary-600 mb-6">
-        🔬 Soil Type Classification
-      </h3>
-      
-      {/* Image Upload Area */}
-      {!prediction && !showManualSelection && (
-        <div className="mb-8">
-          <label className="block text-sm font-medium text-gray-700 mb-4">
-            Upload Soil Image for AI Classification
-          </label>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary-500 transition-colors">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-              id="soil-image-upload"
-            />
-            <label htmlFor="soil-image-upload" className="cursor-pointer">
-              <div className="text-6xl mb-4">📷</div>
-              <p className="text-lg text-gray-600 mb-2">Click to upload soil image</p>
-              <p className="text-sm text-gray-500">
-                Take a clear photo of your soil surface from about 1 meter height
-              </p>
-              <p className="text-xs text-gray-400 mt-2">
-                Supported formats: JPEG, PNG, BMP, GIF (max 16MB)
-              </p>
-            </label>
-          </div>
-          
-          <div className="text-center mt-4">
-            <button 
-              onClick={() => setShowManualSelection(true)}
-              className="text-primary-600 hover:underline text-sm"
-            >
-              Or select soil type manually
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Image Preview */}
-      {imagePreview && (
-        <div className="mb-6">
-          <h4 className="text-lg font-semibold mb-2">Uploaded Image:</h4>
-          <div className="flex justify-center">
-            <img 
-              src={imagePreview} 
-              alt="Soil sample" 
-              className="max-w-xs max-h-64 rounded-lg shadow-md object-cover"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-8">
-          <div className="animate-spin text-4xl mb-4">🔄</div>
-          <p className="text-lg text-primary-600">Analyzing soil image...</p>
-          <p className="text-sm text-gray-500">This may take a few seconds</p>
-        </div>
-      )}
-
-      {/* Prediction Results */}
-      {prediction && (
-        <div className="bg-primary-50 p-6 rounded-xl border border-primary-200 mb-6">
-          <h4 className="text-xl font-bold text-primary-600 mb-4">
-            🎯 Soil Classification Results
-          </h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h5 className="font-semibold mb-2">Predicted Soil Type:</h5>
-              <p className="text-2xl font-bold text-primary-600">
-                {prediction.predicted_soil_type}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">
-                Confidence: {prediction.confidence}%
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Method: {prediction.method.replace('_', ' ')}
-              </p>
-            </div>
-            
-            <div>
-              <h5 className="font-semibold mb-2">Soil Properties:</h5>
-              <div className="space-y-1 text-sm">
-                <div>💧 Water Holding: {prediction.soil_properties?.water_holding_capacity}</div>
-                <div>⬇️ Infiltration: {prediction.soil_properties?.infiltration_rate}</div>
-                <div>🌊 Field Capacity: {(prediction.soil_properties?.field_capacity * 100).toFixed(1)}%</div>
-                <div>📝 Description: {prediction.soil_properties?.description}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Alternative Predictions */}
-          {prediction.alternatives && prediction.alternatives.length > 0 && (
-            <div className="mt-4">
-              <h6 className="font-medium mb-2">Alternative Classifications:</h6>
-              <div className="flex flex-wrap gap-2">
-                {prediction.alternatives.map((alt, index) => (
-                  <span key={index} className="px-3 py-1 bg-gray-100 rounded-full text-sm">
-                    {alt.soil_type} ({alt.confidence}%)
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Extracted Features */}
-          {prediction.extracted_features && (
-            <div className="mt-4 p-3 bg-white rounded-lg">
-              <h6 className="font-medium mb-2 text-sm">Technical Analysis:</h6>
-              <div className="grid grid-cols-3 gap-4 text-xs">
-                <div>Texture: {prediction.extracted_features.texture_variance?.toFixed(1)}</div>
-                <div>Brightness: {prediction.extracted_features.mean_intensity?.toFixed(1)}</div>
-                <div>Edge Density: {(prediction.extracted_features.edge_density * 100)?.toFixed(1)}%</div>
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 mt-4">
-            <button 
-              onClick={() => {
-                setPrediction(null);
-                setImagePreview(null);
-                setSelectedImage(null);
-              }}
-              className="btn btn-outline text-sm"
-            >
-              📷 Upload Different Image
-            </button>
-            <button 
-              onClick={() => setShowManualSelection(true)}
-              className="btn btn-outline text-sm"
-            >
-              ✋ Choose Manually Instead
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Manual Selection */}
-      {showManualSelection && (
-        <div className="mb-6">
-          <h4 className="text-lg font-semibold mb-4">Manual Soil Type Selection</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(soilTypes).map(([type, properties]) => (
-              <div
-                key={type}
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                  manualSoilType === type
-                    ? 'border-primary-500 bg-primary-50'
-                    : 'border-gray-200 bg-white hover:border-primary-300'
-                }`}
-                onClick={() => handleManualSelection(type)}
-              >
-                <h5 className="font-semibold text-primary-600 mb-2">{type}</h5>
-                <p className="text-sm text-gray-600 mb-3">{properties.description}</p>
-                <div className="space-y-1 text-xs">
-                  <div>💧 {properties.water_holding_capacity} water holding</div>
-                  <div>⬇️ {properties.infiltration_rate} infiltration</div>
-                  <div>🌊 {(properties.field_capacity * 100).toFixed(1)}% field capacity</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <div className="text-center mt-4">
-            <button 
-              onClick={() => {
-                setShowManualSelection(false);
-                setManualSoilType('');
-              }}
-              className="text-primary-600 hover:underline text-sm"
-            >
-              ← Back to image upload
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Selected Soil Summary */}
-      {(prediction || manualSoilType) && (
-        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-          <h4 className="font-semibold text-green-700 mb-2">
-            ✅ Soil Type Selected: {formData.soil_type}
-          </h4>
-          <p className="text-sm text-green-600">
-            Confidence: {formData.soil_confidence}% | 
-            Method: {formData.soil_classification_method?.replace('_', ' ')}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const CropInfo = ({ formData, updateFormData, crops }) => {
   const [data, setData] = useState({
     name: formData.crop_info?.name || '',
@@ -648,16 +695,23 @@ const CropInfo = ({ formData, updateFormData, crops }) => {
           </select>
         </div>
         
-        {data.name && (
+        {data.name && crops[data.name] && (
           <>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Growth Stage
               </label>
               <select name="growth_stage" value={data.growth_stage} onChange={handleChange} className="form-input">
-                {crops[data.name]?.growth_stages.map((stage, index) => (
+                {crops[data.name]?.growth_stages?.map((stage, index) => (
                   <option key={index} value={index}>{stage}</option>
-                ))}
+                )) || (
+                  <>
+                    <option value={0}>Initial Stage</option>
+                    <option value={1}>Development Stage</option>
+                    <option value={2}>Mid Season</option>
+                    <option value={3}>Late Season</option>
+                  </>
+                )}
               </select>
             </div>
             
@@ -679,15 +733,15 @@ const CropInfo = ({ formData, updateFormData, crops }) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div className="text-center">
                   <div className="font-medium">Season Length</div>
-                  <div className="text-primary-600">{crops[data.name].season_length} days</div>
+                  <div className="text-primary-600">{crops[data.name]?.season_length || 120} days</div>
                 </div>
                 <div className="text-center">
                   <div className="font-medium">Rooting Depth</div>
-                  <div className="text-primary-600">{crops[data.name].rooting_depth} m</div>
+                  <div className="text-primary-600">{crops[data.name]?.rooting_depth || 0.5} m</div>
                 </div>
                 <div className="text-center">
                   <div className="font-medium">Critical Depletion</div>
-                  <div className="text-primary-600">{(crops[data.name].critical_depletion * 100)}%</div>
+                  <div className="text-primary-600">{((crops[data.name]?.critical_depletion || 0.5) * 100)}%</div>
                 </div>
               </div>
             </div>
@@ -803,7 +857,7 @@ const ReviewInfo = ({ formData, soilTypes, crops }) => {
         { 
           label: 'Growth Stage', 
           value: formData.crop_info?.name && crops[formData.crop_info.name] 
-            ? crops[formData.crop_info.name].growth_stages[formData.crop_info.growth_stage]
+            ? crops[formData.crop_info.name].growth_stages?.[formData.crop_info.growth_stage] || `Stage ${formData.crop_info.growth_stage}`
             : ''
         },
         { label: 'Planting Date', value: formData.crop_info?.planting_date }

@@ -30,7 +30,7 @@ This system reduces water waste by 30-40% and improves crop yields by integratin
 - **Backend**: Python, Flask/Django
 - **AI/ML**: TensorFlow, XGBoost, LSTM
 - **APIs**: OpenWeatherMap
-- **Libraries**: pyfao56, OpenCV
+- **Libraries**: pyfao56, OpenCV, NumPy, Pandas
 
 ## Installation
 - Step 1 :

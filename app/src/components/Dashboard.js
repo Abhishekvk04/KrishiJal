@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://krishijal-server.onrender.com';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://krishijal.onrender.com';
 
 const Dashboard = ({ user, formData, setFormData }) => {
   const [currentStep, setCurrentStep] = useState(1);

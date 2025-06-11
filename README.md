@@ -38,14 +38,19 @@ This system reduces water waste by 30-40% and improves crop yields by integratin
   git clone https://github.com/Abhishekvk04/KrishiJal.git
   cd KrishiJal
   ```
-  
 - Step 2 :
+  ```bash
+  cd backend
+  python3 -m venv venv
+  source venv/bin/activate
+  ```
+- Step 3 :
   ```bash
   cd backend
   pip install -r requirements.txt
   python3 app.py
   ```
-- Step 3 :
+- Step 4 :
   ```bash
   cd app
   npm install

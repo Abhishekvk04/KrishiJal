@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://krishijal-server.onrender.com';
+const API_BASE_URL = 'https://krishijal-server.onrender.com';
+// process.env.REACT_APP_API_URL || 
 
 const Login = ({ setUser }) => {
   const navigate = useNavigate();

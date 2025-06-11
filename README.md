@@ -7,29 +7,31 @@ AI-powered irrigation scheduling tool that combines soil image analysis with rea
 This system reduces water waste by 30-40% and improves crop yields by integrating:
 - **AI soil analysis** using CNN/ResNet models
 - **Real-time weather data** via APIs
-- **Smart scheduling** with XGBoost and LSTM models
+- **Smart scheduling** with Random forest(classifier & Regressor) models
 
 ## Features
 
 - 📸 **Soil Image Analysis**: Upload soil photos for AI-powered texture classification
 - 🌤️ **Weather Integration**: Real-time temperature, humidity, and rainfall data
 - 💧 **Smart Scheduling**: ML-based irrigation recommendations
-- 📱 **Mobile Alerts**: SMS/WhatsApp notifications
 - 💰 **Cost-Effective**: Smartphone-based solution for small farmers
+- This uses penman monteith equation for estimation the water requirements and Evapotranspiration Rate - Which is essential for estimating the  rquirement of irrigation.
 
 ## How It Works
 
 1. **Upload** soil image via smartphone
 2. **Analyze** soil texture using AI
-3. **Fetch** real-time weather data
-4. **Calculate** optimal irrigation schedule
-5. **Receive** SMS/WhatsApp alerts
+3. **Input** All the required details
+4. **Fetch** real-time weather data
+5. **Calculate** optimal irrigation schedule
 
 ## Tech Stack
 
-- **Backend**: Python, Flask/Django
-- **AI/ML**: TensorFlow, XGBoost, LSTM
-- **APIs**: OpenWeatherMap
+- **Fontend**: ReactJS, Tailwind CSS
+- **Backend**: Python, Flask
+- **AI/ML**: TensorFlow, Random forest(classifier & Regressor)
+- **Models**: MobileNetV2
+- **APIs**: Weather API
 - **Libraries**: pyfao56, OpenCV, NumPy, Pandas
 
 ## Installation

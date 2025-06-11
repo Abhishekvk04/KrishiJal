@@ -7,8 +7,11 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
 class WeatherAPIClient:
     def __init__(self, api_key):
+        if not api_key or len(api_key) < 20:
+            raise ValueError("Invalid WeatherAPI key provided")
         self.api_key = api_key
         self.base_url = "http://api.weatherapi.com/v1"
     
@@ -16,15 +19,22 @@ class WeatherAPIClient:
         """Fetch weather data for irrigation scheduling"""
         try:
             forecast_url = f"{self.base_url}/forecast.json"
+            location_str = self.clean_location_parameter(location)
+            
             params = {
                 'key': self.api_key,
-                'q': location,
+                'q': location_str,
                 'days': min(days, 7),
                 'aqi': 'no',
                 'alerts': 'no'
             }
             
-            response = requests.get(forecast_url, params=params, timeout=10)
+            print(f"Requesting weather for: {location_str}")
+            response = requests.get(forecast_url, params=params, timeout=15)
+            
+            if response.status_code == 400:
+                print(f"Bad request - check location format: {location_str}")
+            
             response.raise_for_status()
             data = response.json()
             
@@ -32,24 +42,44 @@ class WeatherAPIClient:
             
         except Exception as e:
             print(f"Weather API error: {e}")
-            return self.get_fallback_weather_data(days)
+            return self.get_fallback_weather_data(days, location)
+    
+    def clean_location_parameter(self, location):
+        """Clean and format location parameter for API"""
+        if isinstance(location, dict):
+            if 'latitude' in location and 'longitude' in location:
+                return f"{location['latitude']},{location['longitude']}"
+            elif 'address' in location:
+                return location['address']
+        elif isinstance(location, str):
+            if location.startswith('GPS:'):
+                coords = location.replace('GPS:', '').strip()
+                coords = ','.join([part.strip() for part in coords.split(',')])
+                return coords
+            else:
+                return location.strip()
+        return str(location)
     
     def process_weather_data(self, api_data):
-        """Convert WeatherAPI response to irrigation system format"""
+        """Convert WeatherAPI response to irrigation system format with validation"""
         weather_data = []
         
         for day_data in api_data['forecast']['forecastday']:
             day = day_data['day']
             
+            temp_max = min(max(day['maxtemp_c'], 15), 50)
+            temp_min = min(max(day['mintemp_c'], 10), 45)
+            humidity = min(max(day['avghumidity'], 10), 100)
+            
             processed_day = {
                 'date': day_data['date'],
-                'temp_max': day['maxtemp_c'],
-                'temp_min': day['mintemp_c'],
-                'temp_avg': day['avgtemp_c'],
-                'humidity': day['avghumidity'],
-                'wind_speed': day['maxwind_kph'] / 3.6,  # Convert kph to m/s
-                'rainfall': day['totalprecip_mm'],
-                'solar_radiation': day.get('uv', 5) * 4,  # Rough conversion
+                'temp_max': temp_max,
+                'temp_min': temp_min,
+                'temp_avg': (temp_max + temp_min) / 2,
+                'humidity': humidity,
+                'wind_speed': max(0, day['maxwind_kph'] / 3.6),
+                'rainfall': max(0, day['totalprecip_mm']),
+                'solar_radiation': max(5, min(35, day.get('uv', 5) * 4)),
                 'weather_condition': day['condition']['text']
             }
             
@@ -57,26 +87,49 @@ class WeatherAPIClient:
         
         return weather_data
     
-    def get_fallback_weather_data(self, days):
-        """Fallback weather data when API fails"""
+    def get_fallback_weather_data(self, days, location=None):
+        """Location-aware fallback weather data when API fails"""
         weather_data = []
         base_date = datetime.now()
+        
+        if location and self.is_coastal_region(location):
+            temp_max_base, temp_min_base, humidity_base, rainfall_base = 32, 24, 75, 3
+        elif location and self.is_arid_region(location):
+            temp_max_base, temp_min_base, humidity_base, rainfall_base = 38, 22, 35, 0.5
+        else:
+            temp_max_base, temp_min_base, humidity_base, rainfall_base = 35, 25, 55, 1
         
         for i in range(days):
             date = base_date + timedelta(days=i)
             weather_data.append({
                 'date': date.strftime('%Y-%m-%d'),
-                'temp_max': 42 + np.random.normal(0, 3),
-                'temp_min': 28 + np.random.normal(0, 2),
-                'temp_avg': 35 + np.random.normal(0, 2),
-                'humidity': 30 + np.random.normal(0, 10),
-                'wind_speed': 6 + np.random.normal(0, 0.5),
-                'rainfall': max(0, np.random.normal(0, 2)),
-                'solar_radiation': 25 + np.random.normal(0, 3),
-                'weather_condition': 'Hot and dry'
+                'temp_max': max(20, temp_max_base + np.random.normal(0, 2)),
+                'temp_min': max(15, temp_min_base + np.random.normal(0, 2)),
+                'temp_avg': (temp_max_base + temp_min_base) / 2 + np.random.normal(0, 1),
+                'humidity': max(20, min(95, humidity_base + np.random.normal(0, 10))),
+                'wind_speed': max(0, 6 + np.random.normal(0, 2)),
+                'rainfall': max(0, rainfall_base + np.random.exponential(1)),
+                'solar_radiation': max(10, 22 + np.random.normal(0, 3)),
+                'weather_condition': 'Partly cloudy'
             })
         
         return weather_data
+    
+    def is_coastal_region(self, location):
+        """Check if location is in coastal region"""
+        if isinstance(location, dict):
+            lat = float(location.get('latitude', 0))
+            lng = float(location.get('longitude', 0))
+            return 12 <= lat <= 15 and 74 <= lng <= 76  # Karnataka coast
+        return False
+    
+    def is_arid_region(self, location):
+        """Check if location is in arid region"""
+        if isinstance(location, dict):
+            lat = float(location.get('latitude', 0))
+            lng = float(location.get('longitude', 0))
+            return 24 <= lat <= 30 and 69 <= lng <= 78  # Rajasthan
+        return False
 
 # Simple ML Predictor fallback
 class IrrigationMLPredictor:

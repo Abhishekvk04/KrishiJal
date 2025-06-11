@@ -33,24 +33,24 @@ This system reduces water waste by 30-40% and improves crop yields by integratin
 - **Libraries**: pyfao56, OpenCV, NumPy, Pandas
 
 ## Installation
-- Step 1 :
+- Step 1 : Clone the repo
   ```bash
   git clone https://github.com/Abhishekvk04/KrishiJal.git
   cd KrishiJal
   ```
-- Step 2 :
+- Step 2 : Create a virtual environment
   ```bash
   cd backend
   python3 -m venv venv
   source venv/bin/activate
   ```
-- Step 3 :
+- Step 3 : Install all dependencies in backend (flask)
   ```bash
   cd backend
   pip install -r requirements.txt
   python3 app.py
   ```
-- Step 4 :
+- Step 4 : Run the frontend(React JS)
   ```bash
   cd app
   npm install
